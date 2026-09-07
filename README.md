@@ -48,7 +48,7 @@ Hệ thống thị giác máy tính (Computer Vision) toàn diện phục vụ p
 
 8. 🖥️ **Streamlit Interactive Web Dashboard**:
    - Giao diện web trực quan để tải lên video trận đấu, tuỳ chỉnh các tham số, chạy phân tích với log thời gian thực.
-   - **Sẵn sàng ngay lập tức**: Khi vừa mở Dashboard, hệ thống tự động hiển thị ngay kết quả phân tích mẫu (chỉ số kiểm soát bóng 2 đội, biểu đồ tròn Donut & Timeline luỹ kế, bảng thông số từng cầu thủ và nút tải video trực tiếp về máy).
+   - **Sẵn sàng ngay lập tức**: Khi vừa mở Dashboard, hệ thống tự động hiển thị ngay kết quả phân tích mẫu (chỉ số kiểm soát bóng 2 đội, biểu đồ tròn Donut & Timeline luỹ kế, bảng thông số từng cầu thủ và thông tin đường dẫn file video đã lưu trên máy).
 
 9. 🔬 **Bộ công cụ chẩn đoán & Visualizer 3D**:
    - Trực quan hoá không gian phân cụm màu áo 3D với Plotly HTML tương tác, nhúng ảnh crop cầu thủ xem trực tiếp khi rê chuột hoặc click vào điểm dữ liệu.
@@ -233,8 +233,8 @@ python app_dashboard.py
 Sau khi khởi chạy, mở trình duyệt web tại: **`http://localhost:8501`**.
 
 > **💡 Điểm nổi bật khi vào Dashboard:**
-> - **Hiển thị tức thì:** Video kết quả phân tích mẫu cùng 4 thẻ chỉ số và 2 biểu đồ phân tích tương tác hiển thị ngay lập tức trên màn hình.
-> - **Tải file nhanh chóng:** Nút **"Tải video về máy"** trực tiếp giúp bạn tải video phân tích về máy để phát bằng mọi trình phát video độ nét cao.
+> - **Hiển thị tức thì:** Kết quả phân tích mẫu cùng 4 thẻ chỉ số và 2 biểu đồ phân tích tương tác hiển thị ngay lập tức trên màn hình.
+> - **Vị trí lưu video rõ ràng:** Hiển thị chính xác đường dẫn file video đã lưu cục bộ (trong `reports/dash_runs/...` hoặc `reports/sample_output.mp4`) để mở trực tiếp trên máy.
 > - **Tải lên video mới:** Chỉ cần kéo thả file video trận đấu mới (`.mp4`, `.webm`) ở thanh bên trái và bấm **"Bắt đầu phân tích"**.
 
 ---

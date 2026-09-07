@@ -251,23 +251,17 @@ def render_results(run_data: dict):
         col3.metric("Số frame phân tích", f"{p.get('frames', 0)}")
         col4.metric("Thời lượng trận", f"~{dur:.1f}s")
 
-    # Khối thông tin & Tải video kết quả
-    st.markdown("### 📥 Tải Video kết quả phân tích")
+    # Khối thông tin vị trí lưu video kết quả
     if video_p and video_p.exists():
+        try:
+            rel_path = video_p.relative_to(BASE)
+        except ValueError:
+            rel_path = video_p
         v_size_mb = video_p.stat().st_size / (1024 * 1024)
-        c_info, c_btn = st.columns([2, 1])
-        with c_info:
-            st.success(f"🎬 **File video:** `{video_p.name}` | Dung lượng: **{v_size_mb:.1f} MB** | Đã gắn Radar 2D & Tracking cầu thủ.")
-        with c_btn:
-            with open(video_p, "rb") as vf:
-                st.download_button(
-                    label=f"💾 Tải video về máy ({v_size_mb:.1f} MB)",
-                    data=vf,
-                    file_name=f"analyzed_{video_p.name}",
-                    mime="video/mp4",
-                    type="primary",
-                    use_container_width=True,
-                )
+        st.info(
+            f"📁 **File video kết quả được lưu tại:** `{rel_path}` *({v_size_mb:.1f} MB)*  \n"
+            f"👉 Bạn có thể mở trực tiếp file tại đường dẫn trên bằng trình phát video (VLC, Windows Media Player, QuickTime)."
+        )
     else:
         st.warning("Chưa có video kết quả.")
 
