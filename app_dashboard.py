@@ -27,6 +27,20 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+# Cho phép chạy trực tiếp bằng cả 'python app_dashboard.py' lẫn 'streamlit run app_dashboard.py'
+try:
+    from streamlit import runtime
+    if not runtime.exists():
+        from streamlit.web import cli as stcli
+        print("============================================================")
+        print("⚽ Đang khởi động Football Match Analysis Web Dashboard...")
+        print("👉 Vui lòng mở trình duyệt tại: http://localhost:8501")
+        print("============================================================")
+        sys.argv = ["streamlit", "run", str(Path(__file__).resolve())] + sys.argv[1:]
+        sys.exit(stcli.main())
+except (ImportError, AttributeError):
+    pass
+
 # ---- Khởi tạo đường dẫn dự án -------------------------------------------- #
 BASE = Path(__file__).resolve().parent
 FOOTBALL_DIR = BASE / "football"
