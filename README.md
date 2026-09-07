@@ -47,7 +47,8 @@ Hệ thống thị giác máy tính (Computer Vision) toàn diện phục vụ p
    - Hiển thị thẻ tốc độ (km/h) trên đầu mỗi cầu thủ, tự động đổi màu đỏ nổi bật kèm ký hiệu `*` khi cầu thủ đang bứt tốc.
 
 8. 🖥️ **Streamlit Interactive Web Dashboard**:
-   - Giao diện web trực quan để chọn video, tuỳ chỉnh các tham số, chạy phân tích với log thời gian thực, xem video kết quả và biểu đồ thống kê tương tác.
+   - Giao diện web trực quan để tải lên video trận đấu, tuỳ chỉnh các tham số, chạy phân tích với log thời gian thực.
+   - **Sẵn sàng ngay lập tức**: Khi vừa mở Dashboard, hệ thống tự động hiển thị ngay kết quả phân tích mẫu (chỉ số kiểm soát bóng 2 đội, biểu đồ tròn Donut & Timeline luỹ kế, bảng thông số từng cầu thủ và nút tải video trực tiếp về máy).
 
 9. 🔬 **Bộ công cụ chẩn đoán & Visualizer 3D**:
    - Trực quan hoá không gian phân cụm màu áo 3D với Plotly HTML tương tác, nhúng ảnh crop cầu thủ xem trực tiếp khi rê chuột hoặc click vào điểm dữ liệu.
@@ -121,16 +122,17 @@ football-analysis-system/
 ├── football/
 │   ├── .gitkeep                  # Thư mục chứa video đầu vào và trọng số mô hình
 │   └── ducanh.jpg                # Ảnh mẫu thử nghiệm
-├── reports/                      # Thư mục lưu kết quả báo cáo mẫu (HTML, JSON, CSV, ảnh preview)
+├── reports/                      # Thư mục lưu kết quả báo cáo mẫu (HTML, JSON, CSV, video demo)
+│   ├── sample_output.mp4         # Video mẫu phân tích hoàn chỉnh sẵn sàng phát ngay khi vào Dashboard
+│   ├── sample_match_stats.json   # Dữ liệu JSON chỉ số trận đấu mẫu
+│   ├── sample_match_stats_players.csv # Bảng chỉ số chi tiết từng cầu thủ mẫu
+│   ├── sample_match_stats.html   # Báo cáo đồ hoạ tương tác HTML mẫu
 │   ├── pitch_homography_test.jpg # Ảnh mẫu kiểm tra căn chỉnh sân
 │   ├── test_preview.jpg          # Ảnh mẫu kết quả phân tích 1 frame
-│   ├── player_clusters_3d.html   # Báo cáo 3D phân cụm màu áo tương tác
-│   ├── match_stats.html          # Báo cáo thống kê toàn diện HTML
-│   ├── match_stats.json          # Dữ liệu JSON chỉ số trận đấu
-│   ├── match_stats_players.csv   # Bảng chỉ số chi tiết từng cầu thủ
-│   └── match_stats_teams.csv     # Bảng chỉ số tổng quan 2 đội bóng
+│   └── player_clusters_3d.html   # Báo cáo 3D phân cụm màu áo tương tác
 ├── app_dashboard.py              # Web Dashboard phân tích bóng đá (Streamlit)
-├── run_dashboard.sh              # Script khởi động nhanh Dashboard
+├── run_dashboard.sh              # Script khởi động nhanh Dashboard trên Linux / macOS
+├── run_dashboard.bat             # Script khởi động nhanh Dashboard trên Windows
 ├── run_dashboard_autostop.sh     # Script quản lý tiến trình Dashboard tự ngắt khi nhàn rỗi
 ├── main.py                       # Điểm vào dòng lệnh (CLI) chạy phân tích video
 ├── requirements.txt              # Danh sách các thư viện phụ thuộc
@@ -186,32 +188,62 @@ pip install git+https://github.com/roboflow/sports.git
 ```
 *(Lưu ý: Bộ mã nguồn đã được lập trình sẵn cơ chế fallback tự động. Ngay cả khi chưa cài gói `sports`, mã nguồn vẫn chạy bình thường với các module nội bộ có sẵn).*
 
-### 3. Cấu hình Model Weights
-Đặt file trọng số fine-tuned YOLO (nếu có) vào thư mục:
-`football/runs/detect/train/weights/best.pt` hoặc chỉ định trực tiếp qua cờ `--weights <đường_dẫn>`. Nếu không truyền trọng số, hệ thống sẽ tự động sử dụng `football/yolov8m.pt` hoặc tải về mô hình tiêu chuẩn.
+### 3. Cấu hình Model Weights & Tự động tải (Auto-Download)
+Hệ thống được thiết kế **hoàn toàn tự động và tự phục hồi (self-healing)**:
+- **Weights AI (`best.pt`)**: Nếu máy bạn chưa có file trọng số, hệ thống sẽ tự động tải file fine-tuned chuẩn từ [GitHub Release v1.0.0](https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/tag/v1.0.0) về thư mục `football/runs/detect/train/weights/best.pt`. Bạn cũng có thể chỉ định trọng số riêng qua cờ `--weights <đường_dẫn>`.
+- **Video mẫu (`test.mp4`)**: Tự động tải từ GitHub Release nếu thư mục `football/` chưa có video đầu vào.
+- **Video kết quả demo (`sample_output.mp4`)**: Đã có sẵn trong repo và tự động tải dự phòng nếu bị thiếu.
 
 ---
 
 ## 💻 Hướng dẫn sử dụng
 
-### 🌟 1. Chạy toàn diện với 1 lệnh duy nhất (`--all`)
-Chạy kiểm tra sân bóng, xuất biểu đồ 3D phân cụm màu áo, ảnh kiểm tra preview, và video kết quả hoàn chỉnh có biểu đồ Voronoi:
+### ⚡ Khởi chạy nhanh khi Clone về máy mới
 ```bash
-python main.py --all --video football/test.mp4 --output football/output.mp4
+git clone https://github.com/ducanhdhtb06-hub/football-match-analysis.git
+cd football-match-analysis
+
+# 1. Khởi tạo môi trường ảo
+python3 -m venv .venv
+source .venv/bin/activate    # Trên Windows: .venv\Scripts\activate
+
+# 2. Cài đặt thư viện
+pip install -r requirements.txt
+
+# 3. Khởi động Web Dashboard
+./run_dashboard.sh           # Trên Windows: run_dashboard.bat
 ```
 
 ---
 
-### 🖥️ 2. Khởi chạy Giao diện Web Dashboard (Streamlit)
+### 🖥️ 1. Khởi chạy Giao diện Web Dashboard (Streamlit)
 Trải nghiệm trực quan toàn bộ tính năng qua giao diện web:
 ```bash
-# Cách 1: Chạy trực tiếp
-streamlit run app_dashboard.py
-
-# Cách 2: Chạy qua script shell
+# Cách 1 (Khuyên dùng - Linux / macOS):
 ./run_dashboard.sh
+
+# Cách 2 (Windows):
+run_dashboard.bat   # Hoặc nhấp đúp chuột vào file run_dashboard.bat
+
+# Cách 3: Chạy trực tiếp qua Streamlit hoặc Python
+streamlit run app_dashboard.py
+# hoặc
+python app_dashboard.py
 ```
-Sau khi khởi chạy, truy cập đường dẫn cục bộ trên trình duyệt: `http://localhost:8501`.
+Sau khi khởi chạy, mở trình duyệt web tại: **`http://localhost:8501`**.
+
+> **💡 Điểm nổi bật khi vào Dashboard:**
+> - **Hiển thị tức thì:** Video kết quả phân tích mẫu cùng 4 thẻ chỉ số và 2 biểu đồ phân tích tương tác hiển thị ngay lập tức trên màn hình.
+> - **Tải file nhanh chóng:** Nút **"Tải video về máy"** trực tiếp giúp bạn tải video phân tích về máy để phát bằng mọi trình phát video độ nét cao.
+> - **Tải lên video mới:** Chỉ cần kéo thả file video trận đấu mới (`.mp4`, `.webm`) ở thanh bên trái và bấm **"Bắt đầu phân tích"**.
+
+---
+
+### 🌟 2. Chạy toàn diện dòng lệnh với 1 lệnh duy nhất (`--all`)
+Chạy kiểm tra sân bóng, xuất biểu đồ 3D phân cụm màu áo, ảnh kiểm tra preview, và video kết quả hoàn chỉnh có biểu đồ Voronoi:
+```bash
+python main.py --all --video football/test.mp4 --output football/output.mp4
+```
 
 ---
 
