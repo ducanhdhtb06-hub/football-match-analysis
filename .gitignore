@@ -1,0 +1,88 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# PyCharm / VS Code IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Environment variables & secrets
+.env
+*.env
+
+# Model weights & training runs
+*.pt
+*.pth
+*.onnx
+*.engine
+football/runs/
+runs/
+football/player-detection/
+football/roboflow-football/
+
+# Media & Video files (Large binary files)
+*.mp4
+*.webm
+*.avi
+*.mov
+*.mkv
+*.flv
+nha.webm
+anh.webm
+output_nha.webm
+
+# Logs
+*.log
+dash_autostop.log
+dash_server.log
+run.log
+
+# Dashboard runs & temporary outputs
+reports/dash_runs/
+output/
+reports/*_frame.jpg
+reports/*.xlsx
+
+# Symlinks inside football/ pointing to root
+football/main.py
+football/src
+football/tools
+football/anh.webm
+football/vid1.webm
+reports/v4_testframe.jpg

@@ -1,0 +1,25 @@
+# Core Vision & Deep Learning
+ultralytics>=8.0.0
+supervision>=0.20.0
+torch
+torchvision
+transformers>=4.30.0
+
+# Image & Data Processing
+numpy
+opencv-python
+pillow
+scikit-learn
+umap-learn
+more-itertools
+tqdm
+
+# Visualization & Interactive Reports
+plotly>=5.0.0
+
+# Pitch Keypoint Detection (Roboflow Inference)
+# Use inference-gpu if running on GPU, or inference for CPU
+inference
+
+# Roboflow Sports (Optional - built-in fallbacks provided if not installed)
+# git+https://github.com/roboflow/sports.git
