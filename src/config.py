@@ -6,38 +6,45 @@ import torch
 
 
 def download_file(url: str, dest: Path):
-    """Download a file with progress notice."""
+    """Download a file safely with temporary file to prevent corrupted partial files."""
     dest.parent.mkdir(parents=True, exist_ok=True)
+    part_file = dest.with_suffix(dest.suffix + ".part")
     print(f"[Auto-Download] Downloading {dest.name} from {url}...")
     import urllib.request
-    urllib.request.urlretrieve(url, dest)
-    print(f"[Auto-Download] Successfully downloaded {dest}!")
+    urllib.request.urlretrieve(url, part_file)
+    if part_file.exists() and part_file.stat().st_size > 0:
+        if dest.exists():
+            dest.unlink()
+        part_file.rename(dest)
+        print(f"[Auto-Download] Successfully downloaded {dest} ({dest.stat().st_size / 1024 / 1024:.1f} MB)!")
 
 
 def find_default_weights() -> str:
     """Find local weights file if available, or auto-download from GitHub release."""
+    project_root = Path(__file__).resolve().parent.parent
     candidates = [
+        project_root / "football/runs/detect/train/weights/best.pt",
+        project_root / "best.pt",
+        project_root / "football/yolov8m.pt",
+        project_root / "yolov8m.pt",
         Path("football/runs/detect/train/weights/best.pt"),
-        Path("/home/anh/PycharmProjects/PythonProject1/football/runs/detect/train/weights/best.pt"),
         Path("best.pt"),
-        Path("football/yolov8m.pt"),
-        Path("yolov8m.pt"),
     ]
     for p in candidates:
-        if p.exists():
+        if p.exists() and p.stat().st_size > 1000:
             return str(p.resolve())
 
     # If no local weights exist, auto-download fine-tuned best.pt from GitHub Release
-    target = Path("football/runs/detect/train/weights/best.pt")
+    target = project_root / "football/runs/detect/train/weights/best.pt"
     release_url = "https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/download/v1.0.0/best.pt"
     try:
         download_file(release_url, target)
-        if target.exists():
+        if target.exists() and target.stat().st_size > 1000:
             return str(target.resolve())
     except Exception as e:
         print(f"[Auto-Download Warning] Could not download weights from {release_url}: {e}")
 
-    return "football/runs/detect/train/weights/best.pt"
+    return str(target)
 
 
 @dataclass

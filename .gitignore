@@ -67,6 +67,9 @@ nha.webm
 anh.webm
 output_nha.webm
 
+# Whitelist demo output for instant dashboard viewing
+!reports/sample_output.mp4
+
 # Logs
 *.log
 dash_autostop.log

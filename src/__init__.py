@@ -6,16 +6,17 @@ Modularized from Cluster_players_into_teams_and_2D_projection.ipynb
 import sys
 from pathlib import Path
 
-for p in [
-    Path.home() / "local/lib/python3.12/dist-packages",
-    Path.home() / "local/lib/python3.12/site-packages",
-    Path.home() / "lib/python3.12/site-packages",
-    Path("/home/anh/snap/antigravity-cli/common/local/lib/python3.12/dist-packages"),
-    Path("/home/anh/snap/antigravity-cli/common/lib/python3.12/site-packages"),
-    Path("/home/anh/PycharmProjects/PythonProject1/.venv/lib/python3.12/site-packages"),
-]:
-    if p.exists() and str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+# Search local virtualenvs if present
+for venv_name in [".venv", "venv"]:
+    venv_dir = BASE_DIR / venv_name
+    if venv_dir.exists():
+        for sp in list(venv_dir.glob("lib/python*/site-packages")) + list(venv_dir.glob("Lib/site-packages")):
+            if sp.exists() and str(sp) not in sys.path:
+                sys.path.insert(0, str(sp))
 
 from .config import (
     ModelConfig,

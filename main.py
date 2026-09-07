@@ -7,16 +7,17 @@ from pathlib import Path
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", message=".*KeyPoints.confidence.*")
 
-for p in [
-    Path.home() / "local/lib/python3.12/dist-packages",
-    Path.home() / "local/lib/python3.12/site-packages",
-    Path.home() / "lib/python3.12/site-packages",
-    Path("/home/anh/snap/antigravity-cli/common/local/lib/python3.12/dist-packages"),
-    Path("/home/anh/snap/antigravity-cli/common/lib/python3.12/site-packages"),
-    Path("/home/anh/PycharmProjects/PythonProject1/.venv/lib/python3.12/site-packages"),
-]:
-    if p.exists() and str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+PROJECT_ROOT = Path(__file__).resolve().parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+# Search local virtualenvs if present
+for venv_name in [".venv", "venv"]:
+    venv_dir = PROJECT_ROOT / venv_name
+    if venv_dir.exists():
+        for sp in list(venv_dir.glob("lib/python*/site-packages")) + list(venv_dir.glob("Lib/site-packages")):
+            if sp.exists() and str(sp) not in sys.path:
+                sys.path.insert(0, str(sp))
 
 
 def parse_args():
@@ -125,13 +126,14 @@ def main():
     video_path = Path(args.video)
     if not video_path.exists():
         candidates = [
+            PROJECT_ROOT / args.video,
+            PROJECT_ROOT / "football" / video_path.name,
+            PROJECT_ROOT / video_path.name,
             Path(video_path.name),
             Path(".") / video_path.name,
             Path("football") / video_path.name,
-            Path("..") / "football" / video_path.name,
-            Path("/home/anh/PycharmProjects/PythonProject1/football") / video_path.name,
-            Path("/home/anh/PycharmProjects/PythonProject1") / video_path.name,
-            Path("/home/anh/Downloads/football") / video_path.name,
+            Path.home() / "Downloads" / video_path.name,
+            Path.home() / "Downloads" / "football" / video_path.name,
         ]
         found = False
         for c in candidates:
@@ -141,17 +143,19 @@ def main():
                 break
 
         if not found and video_path.name == "test.mp4":
-            dl_target = Path("football/test.mp4")
+            dl_target = PROJECT_ROOT / "football/test.mp4"
             dl_url = "https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/download/v1.0.0/test.mp4"
             print(f"[Auto-Download] Video mẫu không có sẵn. Đang tải {dl_url} -> {dl_target}...")
             try:
                 import urllib.request
                 dl_target.parent.mkdir(parents=True, exist_ok=True)
-                urllib.request.urlretrieve(dl_url, dl_target)
-                if dl_target.exists():
+                part = dl_target.with_suffix(".mp4.part")
+                urllib.request.urlretrieve(dl_url, part)
+                if part.exists() and part.stat().st_size > 0:
+                    part.rename(dl_target)
                     video_path = dl_target
                     found = True
-                    print(f"[Auto-Download] Tải video mẫu thành công!")
+                    print(f"[Auto-Download] Tải video mẫu thành công ({dl_target.stat().st_size / 1024 / 1024:.1f} MB)!")
             except Exception as e:
                 print(f"[Auto-Download Warning] Không thể tải video mẫu: {e}")
 

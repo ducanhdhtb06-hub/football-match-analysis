@@ -1,15 +1,20 @@
 """
 Dashboard phân tích bóng đá (Streamlit).
 
-Chạy:  streamlit run app_dashboard.py
-- Chọn video (trong football/, Downloads hoặc tải lên từ máy tính)
-- Tự động tải video mẫu test.mp4 từ GitHub Release nếu chưa có video
-- Chọn tham số (số frame, stride, kp-every, bật stats/overlay/voronoi)
-- Bấm "Chạy phân tích" -> theo dõi log -> xem video kết quả + biểu đồ ngay trên trang.
+Chạy:
+  streamlit run app_dashboard.py
+  hoặc ./run_dashboard.sh (Linux/Mac)
+  hoặc run_dashboard.bat (Windows)
+
+Tính năng chính:
+- Hiển thị NGAY LẬP TỨC video kết quả phân tích & biểu đồ thống kê trận đấu khi vừa mở Dashboard.
+- Hỗ trợ chạy mượt mà trên máy mới khi clone về (tự động cung cấp demo output, tự tải test.mp4 và best.pt từ GitHub Release nếu thiếu).
+- Cho phép xem lại các lần chạy trước đó hoặc chạy phân tích video mới tùy chọn.
 """
 from __future__ import annotations
 
 import datetime as _dt
+import json
 import os
 import shutil
 import subprocess
@@ -18,29 +23,73 @@ import time
 import urllib.request
 from pathlib import Path
 
-import streamlit as st
+import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 
+# ---- Khởi tạo đường dẫn dự án -------------------------------------------- #
 BASE = Path(__file__).resolve().parent
 FOOTBALL_DIR = BASE / "football"
 DOWNLOADS_DIR = Path.home() / "Downloads"
 REPORTS = BASE / "reports"
 RUNS_DIR = REPORTS / "dash_runs"
 
-# Tạo các thư mục cần thiết
+# Đảm bảo các thư mục cần thiết luôn tồn tại
 FOOTBALL_DIR.mkdir(parents=True, exist_ok=True)
 REPORTS.mkdir(parents=True, exist_ok=True)
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
 
+# URL tải dữ liệu mẫu từ GitHub Release (phòng khi máy khác clone về)
 SAMPLE_VIDEO_URL = "https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/download/v1.0.0/test.mp4"
+SAMPLE_OUTPUT_URL = "https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/download/v1.0.0/sample_output.mp4"
 
 
-def is_screen_recording(name: str) -> bool:
-    n = name.lower()
-    return any(k in n for k in ("anh.webm", "nha", "ytdown", "vid1", "output", "demo"))
+# ---- Các hàm tiện ích & Tải dữ liệu --------------------------------------- #
+def ensure_sample_output() -> dict:
+    """Đảm bảo có sẵn video kết quả mẫu và thống kê để hiển thị ngay khi mở Dashboard."""
+    sample_video = REPORTS / "sample_output.mp4"
+    if not sample_video.exists() or sample_video.stat().st_size == 0:
+        try:
+            print(f"[Dashboard] Đang tự động tải video output mẫu từ {SAMPLE_OUTPUT_URL}...")
+            part = sample_video.with_suffix(".mp4.part")
+            urllib.request.urlretrieve(SAMPLE_OUTPUT_URL, part)
+            if part.exists() and part.stat().st_size > 0:
+                part.rename(sample_video)
+        except Exception as e:
+            print(f"[Dashboard Warning] Không thể tải video output mẫu: {e}")
+
+    sample_json = REPORTS / "sample_match_stats.json"
+    sample_csv = REPORTS / "sample_match_stats_players.csv"
+    sample_html = REPORTS / "sample_match_stats.html"
+
+    return {
+        "id": "sample_demo",
+        "title": "📌 Video mẫu kết quả phân tích sẵn (Demo Output)",
+        "video": sample_video if sample_video.exists() else None,
+        "json": sample_json if sample_json.exists() else None,
+        "csv": sample_csv if sample_csv.exists() else None,
+        "html": sample_html if sample_html.exists() else None,
+        "is_sample": True,
+    }
+
+
+def ensure_input_video() -> Path | None:
+    """Tự động tải video đầu vào mẫu test.mp4 nếu trong project chưa có video nào."""
+    target = FOOTBALL_DIR / "test.mp4"
+    if not target.exists() or target.stat().st_size == 0:
+        try:
+            print(f"[Dashboard] Đang tải video đầu vào mẫu {SAMPLE_VIDEO_URL}...")
+            part = target.with_suffix(".mp4.part")
+            urllib.request.urlretrieve(SAMPLE_VIDEO_URL, part)
+            if part.exists() and part.stat().st_size > 0:
+                part.rename(target)
+        except Exception as e:
+            print(f"[Dashboard Warning] Không thể tải video mẫu test.mp4: {e}")
+    return target if target.exists() else None
 
 
 def find_videos() -> dict[str, list[Path]]:
+    """Tìm tất cả các video đầu vào trong thư mục football/ và Downloads."""
     groups: dict[str, list[Path]] = {"Trong project (football/)": [], "Downloads": []}
     exts = (".mp4", ".webm", ".mov", ".mkv")
     if FOOTBALL_DIR.exists():
@@ -53,24 +102,56 @@ def find_videos() -> dict[str, list[Path]]:
             p for p in DOWNLOADS_DIR.iterdir()
             if p.is_file() and p.suffix.lower() in exts and not p.name.startswith("output")
         )
+
+    # Nếu cả 2 đều trống, tự động đảm bảo có video mẫu test.mp4 trong football/
+    if not groups["Trong project (football/)"] and not groups["Downloads"]:
+        sample = ensure_input_video()
+        if sample and sample.exists():
+            groups["Trong project (football/)"] = [sample]
+
     return {k: v for k, v in groups.items() if v}
 
 
-def download_sample_video() -> Path:
-    target = FOOTBALL_DIR / "test.mp4"
-    urllib.request.urlretrieve(SAMPLE_VIDEO_URL, target)
-    return target
+def list_available_runs() -> list[dict]:
+    """Liệt kê các lần chạy kết quả trước đó và video mẫu demo."""
+    runs: list[dict] = []
+    if RUNS_DIR.exists():
+        subdirs = sorted(
+            [d for d in RUNS_DIR.iterdir() if d.is_dir()],
+            key=lambda d: d.stat().st_mtime,
+            reverse=True,
+        )
+        for d in subdirs:
+            v = d / "result.mp4"
+            if v.exists() and v.stat().st_size > 0:
+                runs.append({
+                    "id": d.name,
+                    "title": f"🕒 Lần chạy: {d.name}",
+                    "video": v,
+                    "json": d / "match_stats.json" if (d / "match_stats.json").exists() else None,
+                    "csv": d / "match_stats_players.csv" if (d / "match_stats_players.csv").exists() else None,
+                    "html": d / "match_stats.html" if (d / "match_stats.html").exists() else None,
+                    "is_sample": False,
+                })
+
+    # Luôn gắn bản mẫu demo sẵn có vào danh sách
+    sample = ensure_sample_output()
+    if sample["video"] is not None:
+        runs.append(sample)
+    return runs
 
 
-def load_summary_json(path: Path):
+def load_summary_json(path: Path | None):
+    if not path or not path.exists():
+        return None
     try:
-        import json
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
 
 
 def run_analysis(video: Path, out_dir: Path, args: dict) -> Path:
+    """Thực thi pipeline main.py và truyền stream log thời gian thực về giao diện."""
     out_dir.mkdir(parents=True, exist_ok=True)
     log_path = out_dir / "run.log"
     out_video = out_dir / "result.mp4"
@@ -120,69 +201,167 @@ def run_analysis(video: Path, out_dir: Path, args: dict) -> Path:
     return out_video
 
 
-def plot_summary(summary: dict):
-    poss = summary.get("possession", {})
-    share = poss.get("possession_share_pct", {})
-    teams = summary.get("teams", {})
-    p = summary.get("processed", {})
-    owner_frames = poss.get("owner_frames", 0)
-    dur = float(p.get("duration_s", 0))
+def render_results(run_data: dict):
+    """Hiển thị toàn diện video kết quả phân tích, chỉ số, biểu đồ và bảng cầu thủ."""
+    video_p = run_data.get("video")
+    json_p = run_data.get("json")
+    csv_p = run_data.get("csv")
+    html_p = run_data.get("html")
+    title = run_data.get("title", "Kết quả phân tích")
+    is_sample = run_data.get("is_sample", False)
 
-    def _s(team):
-        return share.get(team, share.get(str(team), 0.0))
-
-    col1, col2, col3, col4 = st.columns(4)
-    if owner_frames > 0:
-        col1.metric("Cầm bóng Đội 0", f"{_s(0):.1f}%")
-        col2.metric("Cầm bóng Đội 1", f"{_s(1):.1f}%")
+    if is_sample:
+        st.info("🎬 **Video kết quả phân tích mẫu (Sẵn sàng ngay khi vào Dashboard).** Bạn có thể tải lên hoặc chọn video khác ở thanh menu bên trái và bấm **'Bắt đầu phân tích'** để xử lý video mới bất kỳ lúc nào.")
     else:
-        col1.metric("Cầm bóng Đội 0", "—")
-        col2.metric("Cầm bóng Đội 1", "—")
-    col3.metric("Số frames", f"{p.get('frames', 0)}")
-    col4.metric("Thời lượng video", f"~{dur:.1f}s")
+        st.success(f"🎬 **Đang hiển thị video kết quả phân tích: `{title}`**")
 
-    c1, c2 = st.columns(2)
-    with c1:
-        fig = go.Figure(go.Pie(
-            labels=["Đội 0 (Xanh)", "Đội 1 (Hồng)"],
-            values=[_s(0), _s(1)],
-            hole=0.45,
-            marker=dict(colors=["#00BFFF", "#FF1493"])
-        ))
-        fig.update_layout(title="Tỉ lệ kiểm soát bóng (%)", height=320)
-        st.plotly_chart(fig, use_container_width=True)
-    with c2:
-        tl = poss.get("timeline_s", [])
-        if tl:
-            ca = cb = 0.0
-            x, ya, yb = [], [], []
-            for b in tl:
-                ca += b.get("a", 0)
-                cb += b.get("b", 0)
-                tot = max(ca + cb, 1e-6)
-                x.append(b["t"])
-                ya.append(100 * ca / tot)
-                yb.append(100 * cb / tot)
-            fig2 = go.Figure()
-            fig2.add_trace(go.Scatter(x=x, y=ya, name="Đội 0", line=dict(color="#00BFFF", width=2)))
-            fig2.add_trace(go.Scatter(x=x, y=yb, name="Đội 1", line=dict(color="#FF1493", width=2)))
-            fig2.update_layout(title="Diễn biến kiểm soát bóng luỹ kế (%)", height=320)
-            st.plotly_chart(fig2, use_container_width=True)
+    # Thống kê tổng quan thẻ cards
+    summary = load_summary_json(json_p)
+    if summary:
+        poss = summary.get("possession", {})
+        share = poss.get("possession_share_pct", {})
+        p = summary.get("processed", {})
+        owner_frames = poss.get("owner_frames", 0)
+        dur = float(p.get("duration_s", 0))
+
+        def _s(team):
+            return share.get(team, share.get(str(team), 0.0))
+
+        col1, col2, col3, col4 = st.columns(4)
+        if owner_frames > 0:
+            col1.metric("Cầm bóng Đội 0 (Xanh)", f"{_s(0):.1f}%")
+            col2.metric("Cầm bóng Đội 1 (Hồng)", f"{_s(1):.1f}%")
         else:
-            st.info("Chưa đủ dữ liệu timeline (video quá ngắn)")
+            col1.metric("Cầm bóng Đội 0", "—")
+            col2.metric("Cầm bóng Đội 1", "—")
+        col3.metric("Số frame phân tích", f"{p.get('frames', 0)}")
+        col4.metric("Thời lượng trận", f"~{dur:.1f}s")
+
+    # Bố cục 2 cột: Video bên trái, Biểu đồ bên phải
+    c_vid, c_charts = st.columns([1.15, 0.85])
+
+    with c_vid:
+        st.subheader("🎥 Video phân tích & 2D Radar sân bóng")
+        if video_p and video_p.exists():
+            st.video(str(video_p))
+            with open(video_p, "rb") as vf:
+                st.download_button(
+                    label="💾 Tải video kết quả về máy (.mp4)",
+                    data=vf,
+                    file_name=f"analyzed_{video_p.name}",
+                    mime="video/mp4",
+                    use_container_width=True,
+                )
+        else:
+            st.warning("Chưa có video kết quả.")
+
+    with c_charts:
+        st.subheader("📊 Biểu đồ kiểm soát bóng")
+        if summary:
+            poss = summary.get("possession", {})
+            share = poss.get("possession_share_pct", {})
+
+            def _s(team):
+                return share.get(team, share.get(str(team), 0.0))
+
+            fig_donut = go.Figure(go.Pie(
+                labels=["Đội 0 (Xanh)", "Đội 1 (Hồng)"],
+                values=[_s(0), _s(1)],
+                hole=0.45,
+                marker=dict(colors=["#00BFFF", "#FF1493"])
+            ))
+            fig_donut.update_layout(
+                title="Tỉ lệ kiểm soát bóng (%)",
+                height=260,
+                margin=dict(t=40, b=10, l=10, r=10),
+            )
+            st.plotly_chart(fig_donut, use_container_width=True)
+
+            tl = poss.get("timeline_s", [])
+            if tl:
+                ca = cb = 0.0
+                x, ya, yb = [], [], []
+                for b in tl:
+                    ca += b.get("a", 0)
+                    cb += b.get("b", 0)
+                    tot = max(ca + cb, 1e-6)
+                    x.append(b["t"])
+                    ya.append(100 * ca / tot)
+                    yb.append(100 * cb / tot)
+                fig_line = go.Figure()
+                fig_line.add_trace(go.Scatter(x=x, y=ya, name="Đội 0", line=dict(color="#00BFFF", width=2)))
+                fig_line.add_trace(go.Scatter(x=x, y=yb, name="Đội 1", line=dict(color="#FF1493", width=2)))
+                fig_line.update_layout(
+                    title="Diễn biến kiểm soát bóng luỹ kế (%)",
+                    height=260,
+                    margin=dict(t=40, b=10, l=10, r=10),
+                )
+                st.plotly_chart(fig_line, use_container_width=True)
+            else:
+                st.info("Chưa có dữ liệu diễn biến thời gian.")
+        else:
+            st.info("Chưa có tệp dữ liệu thống kê match_stats.json.")
+
+    # Bảng chi tiết từng cầu thủ
+    if csv_p and csv_p.exists():
+        st.divider()
+        st.subheader("🏃‍♂️ Thống kê chi tiết từng cầu thủ (Vận tốc, Cự ly & Bứt tốc)")
+        try:
+            df_players = pd.read_csv(csv_p)
+            st.dataframe(df_players, use_container_width=True)
+        except Exception as e:
+            st.warning(f"Không thể đọc bảng chi tiết cầu thủ: {e}")
+
+    # Báo cáo đồ họa tương tác HTML
+    if html_p and html_p.exists():
+        st.divider()
+        with open(html_p, "rb") as hf:
+            st.download_button(
+                label="📄 Tải toàn bộ báo cáo đồ họa tương tác HTML (match_stats.html)",
+                data=hf,
+                file_name="match_stats.html",
+                mime="text/html",
+                use_container_width=True,
+            )
 
 
 # ---- Cấu hình Trang Streamlit -------------------------------------------- #
 st.set_page_config(page_title="⚽ Football Analysis Dashboard", page_icon="⚽", layout="wide")
 
 st.title("⚽ Football Analysis & 2D Tactical Pitch Projection")
-st.caption("Phân tích chiến thuật, theo dõi cầu thủ, radar sân 2D và thống kê chỉ số bóng đá tự động.")
+st.caption("Hệ thống AI phân tích chiến thuật, theo dõi cầu thủ, radar sân 2D và trích xuất chỉ số bóng đá tự động.")
 
-# ---- Tải danh sách video -------------------------------------------------- #
-groups_full = find_videos()
+# Đảm bảo danh sách các lần chạy
+available_runs = list_available_runs()
+if not available_runs:
+    available_runs = [ensure_sample_output()]
 
+# Mặc định hiển thị lần chạy mới nhất (hoặc bản mẫu demo khi mới clone)
+if "active_run_id" not in st.session_state:
+    st.session_state["active_run_id"] = available_runs[0]["id"]
+
+# Đảm bảo active_run_id hợp lệ
+valid_ids = [r["id"] for r in available_runs]
+if st.session_state["active_run_id"] not in valid_ids:
+    st.session_state["active_run_id"] = available_runs[0]["id"]
+
+# ---- Thanh công cụ bên trái (Sidebar) ------------------------------------ #
 with st.sidebar:
-    st.header("⚙️ Cấu hình phân tích")
+    st.header("📺 Chọn video kết quả xem")
+    run_options = {r["id"]: r["title"] for r in available_runs}
+    current_run_idx = valid_ids.index(st.session_state["active_run_id"])
+
+    selected_run_id = st.selectbox(
+        "Video kết quả đang hiển thị:",
+        options=valid_ids,
+        index=current_run_idx,
+        format_func=lambda x: run_options[x],
+        key="run_selector",
+    )
+    st.session_state["active_run_id"] = selected_run_id
+
+    st.divider()
+    st.header("🚀 Chạy phân tích video mới")
 
     # 1. Tải lên video mới
     uploaded_file = st.file_uploader(
@@ -198,17 +377,7 @@ with st.sidebar:
             st.success(f"Đã lưu: `{uploaded_file.name}`")
             st.rerun()
 
-    # 2. Tải video mẫu nếu chưa có
-    if st.button("📥 Tải video mẫu test.mp4 (14MB)", help="Tải video mẫu trận đấu từ GitHub Release về máy"):
-        with st.spinner("Đang tải video mẫu test.mp4..."):
-            try:
-                download_sample_video()
-                st.success("Tải video mẫu thành công!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Lỗi tải video mẫu: {e}")
-
-    # Cập nhật danh sách sau khi upload / download
+    # 2. Danh sách video đầu vào
     groups_full = find_videos()
     label_map = {}
     for group, lst in groups_full.items():
@@ -218,7 +387,7 @@ with st.sidebar:
     if label_map:
         ordered = list(label_map.keys())
         choice = st.selectbox(
-            "Chọn video đầu vào",
+            "Chọn video đầu vào cần phân tích",
             ordered,
             key="video_select",
         )
@@ -226,52 +395,38 @@ with st.sidebar:
         st.caption(f"👉 File được chọn: `{selected_video.name}`")
     else:
         selected_video = None
+        st.warning("Chưa có video đầu vào. Hãy tải lên video ở trên.")
 
     st.divider()
-    max_frames = st.slider("Số khung hình tối đa (Frames)", 30, 3000, 150, step=30,
-                           help="Giới hạn số frame để kiểm tra nhanh. 150 frames tương đương khoảng 5-6 giây.")
+    max_frames = st.slider(
+        "Số khung hình tối đa (Frames)", 30, 3000, 150, step=30,
+        help="Giới hạn số frame để kiểm tra nhanh. 150 frames tương đương khoảng 5-6 giây."
+    )
     full_video = st.checkbox("▶️ Phân tích TOÀN BỘ video", value=False)
     if full_video:
         max_frames = 999999
 
-    stride = st.select_slider("Stride (bước nhảy frame)", options=[1, 2, 3, 4], value=2,
-                              help="1 = xử lý từng frame; 2-3 = xử lý cách khung giúp tăng tốc 2-3 lần.")
-    kp_every = st.slider("Keypoints frequency (kp-every)", 1, 8, 3,
-                         help="Suy luận điểm mốc sân mỗi N frame để tăng tốc.")
+    stride = st.select_slider(
+        "Stride (bước nhảy frame)", options=[1, 2, 3, 4], value=2,
+        help="1 = xử lý từng frame; 2-3 = xử lý cách khung giúp tăng tốc 2-3 lần."
+    )
+    kp_every = st.slider(
+        "Keypoints frequency (kp-every)", 1, 8, 3,
+        help="Suy luận điểm mốc sân mỗi N frame để tăng tốc."
+    )
     run_stats = st.checkbox("📊 Xuất báo cáo chỉ số (--stats)", value=True)
     run_overlay = st.checkbox("🎬 Live Overlay lên video (--overlay)", value=True)
     run_voronoi = st.checkbox("🔺 Vùng kiểm soát Voronoi (--voronoi)", value=False)
 
     start = st.button("🚀 Bắt đầu phân tích", type="primary", use_container_width=True, disabled=(selected_video is None))
 
-# ---- Khung hiển thị chính ------------------------------------------------ #
-if selected_video is None:
-    st.info("👋 **Chưa có video nào trong hệ thống.**")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("### Cách 1: Thử ngay với video mẫu")
-        st.markdown("Bấm nút bên dưới để tự động tải clip trận đấu mẫu `test.mp4` từ GitHub:")
-        if st.button("📥 Tải video mẫu ngay (14MB)", type="primary"):
-            with st.spinner("Đang tải video mẫu..."):
-                try:
-                    download_sample_video()
-                    st.success("Tải video mẫu thành công! Đang tải lại trang...")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Lỗi tải video mẫu: {e}")
-    with col_b:
-        st.markdown("### Cách 2: Tải lên video trận đấu của bạn")
-        st.markdown("Kéo thả hoặc duyệt file video bóng đá `.mp4` / `.webm` từ máy tính ở thanh menu bên trái.")
-    st.stop()
-
-st.subheader(f"Video đang chọn: `{selected_video.name}`")
-
-if start:
+# ---- Xử lý khi bấm 'Bắt đầu phân tích' ------------------------------------ #
+if start and selected_video is not None:
     safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in selected_video.stem)[:24]
     stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + safe
     out_dir = RUNS_DIR / stamp
 
-    st.info(f"Đang phân tích video: `{selected_video.name}`...")
+    st.info(f"Đang tiến hành phân tích video: `{selected_video.name}`...")
     out_video = run_analysis(
         selected_video, out_dir,
         {
@@ -285,47 +440,13 @@ if start:
     )
 
     if out_video.exists() and out_video.stat().st_size > 0:
+        st.session_state["active_run_id"] = stamp
         st.success("🎉 Phân tích video hoàn tất!")
-
-        # Phát video kết quả trực tiếp trên trang Web
-        st.subheader("🎥 Video kết quả phân tích")
-        try:
-            st.video(str(out_video))
-            with open(out_video, "rb") as vf:
-                st.download_button(
-                    label="💾 Tải video kết quả về máy (.mp4)",
-                    data=vf,
-                    file_name=f"analyzed_{selected_video.name}",
-                    mime="video/mp4",
-                )
-        except Exception as e:
-            st.warning(f"Không thể phát video trực tiếp trên trình duyệt: {e}. Bạn có thể mở file tại `{out_video}`.")
-
-        # Hiển thị số liệu thống kê
-        summary = load_summary_json(out_dir / "match_stats.json") if run_stats else None
-        if summary:
-            st.header("📊 Báo cáo chỉ số trận đấu")
-            plot_summary(summary)
-
-            # Bảng số liệu chi tiết cầu thủ nếu có
-            csv_players = out_dir / "match_stats_players.csv"
-            if csv_players.exists():
-                try:
-                    import pandas as pd
-                    df_players = pd.read_csv(csv_players)
-                    st.subheader("🏃‍♂️ Thống kê chi tiết từng cầu thủ")
-                    st.dataframe(df_players, use_container_width=True)
-                except Exception:
-                    pass
-
-            html_report = out_dir / "match_stats.html"
-            if html_report.exists():
-                with open(html_report, "rb") as hf:
-                    st.download_button(
-                        label="📄 Tải báo cáo đồ họa tương tác (match_stats.html)",
-                        data=hf,
-                        file_name="match_stats.html",
-                        mime="text/html",
-                    )
+        st.rerun()
     else:
         st.error("Không tìm thấy file video kết quả sau khi chạy. Hãy kiểm tra lại log bên trên.")
+
+# ---- HIỂN THỊ KẾT QUẢ VIDEO OUTPUT NGAY LẬP TỨC --------------------------- #
+active_run_obj = next((r for r in available_runs if r["id"] == st.session_state["active_run_id"]), available_runs[0])
+render_results(active_run_obj)
+
