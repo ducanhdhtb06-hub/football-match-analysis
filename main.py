@@ -11,13 +11,30 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-# Search local virtualenvs if present
+# Search local virtual environments and user package directories
+search_dirs = [
+    Path.home() / "local/lib/python3.12/dist-packages",
+    Path.home() / "local/lib/python3.12/site-packages",
+    Path.home() / "lib/python3.12/site-packages",
+    Path.home() / ".local/lib/python3.12/site-packages",
+    Path.home() / ".local/lib/python3.12/dist-packages",
+    Path("/home/anh/snap/antigravity-cli/common/local/lib/python3.12/dist-packages"),
+    Path("/home/anh/snap/antigravity-cli/common/lib/python3.12/site-packages"),
+    Path("/home/anh/.local/lib/python3.12/site-packages"),
+    Path("/home/anh/.local/lib/python3.12/dist-packages"),
+    Path("/home/anh/local/lib/python3.12/dist-packages"),
+]
+
 for venv_name in [".venv", "venv"]:
     venv_dir = PROJECT_ROOT / venv_name
     if venv_dir.exists():
-        for sp in list(venv_dir.glob("lib/python*/site-packages")) + list(venv_dir.glob("Lib/site-packages")):
-            if sp.exists() and str(sp) not in sys.path:
-                sys.path.insert(0, str(sp))
+        search_dirs.extend(venv_dir.glob("lib/python*/site-packages"))
+        search_dirs.extend(venv_dir.glob("lib/python*/dist-packages"))
+        search_dirs.extend(venv_dir.glob("Lib/site-packages"))
+
+for p in search_dirs:
+    if p.exists() and str(p) not in sys.path:
+        sys.path.insert(0, str(p))
 
 
 def parse_args():
