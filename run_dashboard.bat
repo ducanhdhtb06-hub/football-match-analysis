@@ -36,12 +36,39 @@ if %ERRORLEVEL% EQU 0 (
 
 echo.
 echo ============================================================
-echo [Loi] Chua tim thay Streamlit hoac thu vien can thiet!
+echo [Thong bao] Chua tim thay moi truong ao hoac Streamlit!
 echo ============================================================
-echo Vui long mo CMD / Terminal trong thu muc nay va chay:
+echo.
+set /p AUTO_INSTALL="Ban co muon he thong TU DONG cai dat thu vien ngay bay gio khong? (Y/N): "
+if /i "!AUTO_INSTALL!"=="Y" (
+    echo.
+    echo [1/3] Dang kiem tra Python...
+    where python >nul 2>nul
+    if !ERRORLEVEL! NEQ 0 (
+        echo [Loi] May chua cai dat Python! Vui long cai dat Python tai https://www.python.org/ (nho tich "Add Python to PATH").
+        pause
+        goto end
+    )
+    echo [2/3] Dang khoi tao moi truong ao (.venv)...
+    python -m venv .venv
+    call ".venv\Scripts\activate.bat"
+    echo [3/3] Dang cai dat cac thu vien can thiet (co the mat vai phut tuy toc do mang)...
+    python -m pip install --upgrade pip
+    pip install -r requirements.txt
+    echo.
+    echo ============================================================
+    echo [Thanh cong] Cai dat hoan tat! Dang mo Web Dashboard...
+    echo ============================================================
+    streamlit run app_dashboard.py
+    goto end
+)
+
+echo.
+echo Hoac ban co the tu cai dat bang tay:
 echo   python -m venv .venv
 echo   .venv\Scripts\activate
 echo   pip install -r requirements.txt
+echo   run_dashboard.bat
 echo.
 pause
 

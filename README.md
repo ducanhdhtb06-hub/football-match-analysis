@@ -198,39 +198,40 @@ Hệ thống được thiết kế **hoàn toàn tự động và tự phục h�
 
 ## 💻 Hướng dẫn sử dụng
 
-### ⚡ Khởi chạy nhanh khi Clone về máy mới
+### ⚡ Dành cho máy mới tải về lần đầu (First-time Setup)
+
+#### 🪟 Dành cho người dùng Windows (Cực kỳ đơn giản):
+1. Tải code về máy (`git clone https://github.com/ducanhdhtb06-hub/football-match-analysis.git` hoặc tải file ZIP từ GitHub rồi giải nén).
+2. **Cách 1 (Tự động 1-click):** Chỉ cần **nhấp đúp chuột vào file `run_dashboard.bat`** (hoặc `install_windows.bat`). Hệ thống sẽ tự hỏi và tự động cài đặt trọn gói môi trường, thư viện và mở trình duyệt cho bạn!
+3. **Cách 2 (Bằng Command Prompt / PowerShell):**
+   ```cmd
+   cd football-match-analysis
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements.txt
+   run_dashboard.bat
+   ```
+
+#### 🐧 Dành cho Linux / macOS:
 ```bash
 git clone https://github.com/ducanhdhtb06-hub/football-match-analysis.git
 cd football-match-analysis
 
-# 1. Khởi tạo môi trường ảo
 python3 -m venv .venv
-source .venv/bin/activate    # Trên Windows: .venv\Scripts\activate
-
-# 2. Cài đặt thư viện
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# 3. Khởi động Web Dashboard
-./run_dashboard.sh           # Trên Windows: run_dashboard.bat
+./run_dashboard.sh
 ```
 
 ---
 
-### 🖥️ 1. Khởi chạy Giao diện Web Dashboard (Streamlit)
-Trải nghiệm trực quan toàn bộ tính năng qua giao diện web:
-```bash
-# Cách 1 (Khuyên dùng - Linux / macOS):
-./run_dashboard.sh
+### 🖥️ Khởi động sử dụng hàng ngày (Daily Usage)
+Khi máy đã cài đặt xong ở bước trên, từ những lần sau bạn chỉ cần:
+- **Trên Windows:** Nhấp đúp chuột vào file **`run_dashboard.bat`**.
+- **Trên Linux / macOS:** Chạy file **`./run_dashboard.sh`**.
+- **Hoặc gõ lệnh:** `streamlit run app_dashboard.py` (hoặc `python app_dashboard.py`).
 
-# Cách 2 (Windows):
-run_dashboard.bat   # Hoặc nhấp đúp chuột vào file run_dashboard.bat
-
-# Cách 3: Chạy trực tiếp qua Streamlit hoặc Python
-streamlit run app_dashboard.py
-# hoặc
-python app_dashboard.py
-```
-Sau khi khởi chạy, mở trình duyệt web tại: **`http://localhost:8501`**.
+Trình duyệt web sẽ tự động mở trang Dashboard tại địa chỉ: **`http://localhost:8501`**.
 
 > **💡 Điểm nổi bật khi vào Dashboard:**
 > - **Hiển thị tức thì:** Kết quả phân tích mẫu cùng 4 thẻ chỉ số và 2 biểu đồ phân tích tương tác hiển thị ngay lập tức trên màn hình.
