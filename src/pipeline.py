@@ -1,5 +1,7 @@
 import warnings
 from pathlib import Path
+import shutil
+import subprocess
 from typing import List, Optional
 import cv2
 import numpy as np
@@ -442,6 +444,9 @@ class FootballAnalysisPipeline:
 
         print(f"\n[Success] Video processing completed! Saved to: {target_path}")
 
+        # Ensure web compatibility (H.264 / yuv420p) so browser can play video directly
+        self._ensure_web_compatible_mp4(target_path)
+
         # ---- post-match statistics --------------------------------------- #
         if stats_recorder is not None and len(stats_recorder) > 0:
             analyzer = MatchStatsAnalyzer(
@@ -487,3 +492,30 @@ class FootballAnalysisPipeline:
         for name, pth in files.items():
             print(f"  ✔ {name}: {Path(pth)}")
         print("=" * 62 + "\n")
+
+    @staticmethod
+    def _ensure_web_compatible_mp4(target_path: str) -> None:
+        """Convert video to H.264 (yuv420p + faststart) for 100% web browser compatibility."""
+        target_p = Path(target_path)
+        if target_p.suffix.lower() != ".mp4":
+            return
+        try:
+            import imageio_ffmpeg
+            ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
+            temp_out = target_p.with_name(f"{target_p.stem}_web.mp4")
+            cmd = [
+                ffmpeg_exe, "-y",
+                "-i", str(target_p),
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                str(temp_out),
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if res.returncode == 0 and temp_out.exists() and temp_out.stat().st_size > 0:
+                temp_out.replace(target_p)
+                print(f"[Web Compatibility] Video converted to H.264 for instant browser playback: {target_p.name}")
+        except Exception:
+            pass
