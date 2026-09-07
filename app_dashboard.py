@@ -377,39 +377,22 @@ with st.sidebar:
     st.divider()
     st.header("🚀 Chạy phân tích video mới")
 
-    # 1. Tải lên video mới
+    # Tải lên video mới trực tiếp từ máy tính
     uploaded_file = st.file_uploader(
         "📁 Tải lên video mới (.mp4, .webm)",
         type=["mp4", "webm", "mov", "mkv"],
-        help="Chọn video bóng đá từ máy của bạn để thêm vào danh sách phân tích."
+        help="Chọn video bóng đá từ máy của bạn để phân tích."
     )
+    selected_video: Path | None = None
     if uploaded_file is not None:
         save_path = FOOTBALL_DIR / uploaded_file.name
-        if not save_path.exists():
+        if not save_path.exists() or save_path.stat().st_size != uploaded_file.size:
             with open(save_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
-            st.success(f"Đã lưu: `{uploaded_file.name}`")
-            st.rerun()
-
-    # 2. Danh sách video đầu vào
-    groups_full = find_videos()
-    label_map = {}
-    for group, lst in groups_full.items():
-        for p in lst:
-            label_map[f"{group} — {p.name}"] = p
-
-    if label_map:
-        ordered = list(label_map.keys())
-        choice = st.selectbox(
-            "Chọn video đầu vào cần phân tích",
-            ordered,
-            key="video_select",
-        )
-        selected_video = label_map[choice]
-        st.caption(f"👉 File được chọn: `{selected_video.name}`")
+        selected_video = save_path
+        st.success(f"✅ Đã chọn video: `{uploaded_file.name}` ({uploaded_file.size / (1024 * 1024):.1f} MB)")
     else:
-        selected_video = None
-        st.warning("Chưa có video đầu vào. Hãy tải lên video ở trên.")
+        st.caption("ℹ️ Kéo thả hoặc chọn video bóng đá ở trên để phân tích.")
 
     st.divider()
     max_frames = st.slider(
