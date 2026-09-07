@@ -140,10 +140,25 @@ def main():
                 found = True
                 break
 
+        if not found and video_path.name == "test.mp4":
+            dl_target = Path("football/test.mp4")
+            dl_url = "https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/download/v1.0.0/test.mp4"
+            print(f"[Auto-Download] Video mẫu không có sẵn. Đang tải {dl_url} -> {dl_target}...")
+            try:
+                import urllib.request
+                dl_target.parent.mkdir(parents=True, exist_ok=True)
+                urllib.request.urlretrieve(dl_url, dl_target)
+                if dl_target.exists():
+                    video_path = dl_target
+                    found = True
+                    print(f"[Auto-Download] Tải video mẫu thành công!")
+            except Exception as e:
+                print(f"[Auto-Download Warning] Không thể tải video mẫu: {e}")
+
         if not found:
             # Search project for all valid videos
             available_videos = []
-            for root_dir in [Path("."), Path("football"), Path("/home/anh/Downloads/football")]:
+            for root_dir in [Path("."), Path("football")]:
                 if root_dir.exists():
                     for ext in ["*.mp4", "*.webm", "*.mkv"]:
                         available_videos.extend(root_dir.glob(ext))

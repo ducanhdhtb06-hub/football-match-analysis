@@ -5,12 +5,20 @@ from typing import List, Optional
 import torch
 
 
+def download_file(url: str, dest: Path):
+    """Download a file with progress notice."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[Auto-Download] Downloading {dest.name} from {url}...")
+    import urllib.request
+    urllib.request.urlretrieve(url, dest)
+    print(f"[Auto-Download] Successfully downloaded {dest}!")
+
+
 def find_default_weights() -> str:
-    """Find local weights file if available."""
+    """Find local weights file if available, or auto-download from GitHub release."""
     candidates = [
         Path("football/runs/detect/train/weights/best.pt"),
         Path("/home/anh/PycharmProjects/PythonProject1/football/runs/detect/train/weights/best.pt"),
-        Path("/home/anh/Downloads/football/runs/detect/train/weights/best.pt"),
         Path("best.pt"),
         Path("football/yolov8m.pt"),
         Path("yolov8m.pt"),
@@ -18,6 +26,17 @@ def find_default_weights() -> str:
     for p in candidates:
         if p.exists():
             return str(p.resolve())
+
+    # If no local weights exist, auto-download fine-tuned best.pt from GitHub Release
+    target = Path("football/runs/detect/train/weights/best.pt")
+    release_url = "https://github.com/ducanhdhtb06-hub/football-match-analysis/releases/download/v1.0.0/best.pt"
+    try:
+        download_file(release_url, target)
+        if target.exists():
+            return str(target.resolve())
+    except Exception as e:
+        print(f"[Auto-Download Warning] Could not download weights from {release_url}: {e}")
+
     return "football/runs/detect/train/weights/best.pt"
 
 
