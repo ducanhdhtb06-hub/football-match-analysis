@@ -251,33 +251,39 @@ def render_results(run_data: dict):
         col3.metric("Số frame phân tích", f"{p.get('frames', 0)}")
         col4.metric("Thời lượng trận", f"~{dur:.1f}s")
 
-    # Bố cục 2 cột: Video bên trái, Biểu đồ bên phải
-    c_vid, c_charts = st.columns([1.15, 0.85])
-
-    with c_vid:
-        st.subheader("🎥 Video phân tích & 2D Radar sân bóng")
-        if video_p and video_p.exists():
-            st.video(str(video_p))
+    # Khối thông tin & Tải video kết quả
+    st.markdown("### 📥 Tải Video kết quả phân tích")
+    if video_p and video_p.exists():
+        v_size_mb = video_p.stat().st_size / (1024 * 1024)
+        c_info, c_btn = st.columns([2, 1])
+        with c_info:
+            st.success(f"🎬 **File video:** `{video_p.name}` | Dung lượng: **{v_size_mb:.1f} MB** | Đã gắn Radar 2D & Tracking cầu thủ.")
+        with c_btn:
             with open(video_p, "rb") as vf:
                 st.download_button(
-                    label="💾 Tải video kết quả về máy (.mp4)",
+                    label=f"💾 Tải video về máy ({v_size_mb:.1f} MB)",
                     data=vf,
                     file_name=f"analyzed_{video_p.name}",
                     mime="video/mp4",
+                    type="primary",
                     use_container_width=True,
                 )
-        else:
-            st.warning("Chưa có video kết quả.")
+    else:
+        st.warning("Chưa có video kết quả.")
 
-    with c_charts:
-        st.subheader("📊 Biểu đồ kiểm soát bóng")
-        if summary:
-            poss = summary.get("possession", {})
-            share = poss.get("possession_share_pct", {})
+    st.divider()
 
-            def _s(team):
-                return share.get(team, share.get(str(team), 0.0))
+    # Bố cục 2 cột biểu đồ phân tích
+    st.subheader("📊 Biểu đồ kiểm soát bóng & Diễn biến trận đấu")
+    if summary:
+        poss = summary.get("possession", {})
+        share = poss.get("possession_share_pct", {})
 
+        def _s(team):
+            return share.get(team, share.get(str(team), 0.0))
+
+        c1, c2 = st.columns(2)
+        with c1:
             fig_donut = go.Figure(go.Pie(
                 labels=["Đội 0 (Xanh)", "Đội 1 (Hồng)"],
                 values=[_s(0), _s(1)],
@@ -286,11 +292,12 @@ def render_results(run_data: dict):
             ))
             fig_donut.update_layout(
                 title="Tỉ lệ kiểm soát bóng (%)",
-                height=260,
+                height=300,
                 margin=dict(t=40, b=10, l=10, r=10),
             )
             st.plotly_chart(fig_donut, use_container_width=True)
 
+        with c2:
             tl = poss.get("timeline_s", [])
             if tl:
                 ca = cb = 0.0
@@ -303,18 +310,18 @@ def render_results(run_data: dict):
                     ya.append(100 * ca / tot)
                     yb.append(100 * cb / tot)
                 fig_line = go.Figure()
-                fig_line.add_trace(go.Scatter(x=x, y=ya, name="Đội 0", line=dict(color="#00BFFF", width=2)))
-                fig_line.add_trace(go.Scatter(x=x, y=yb, name="Đội 1", line=dict(color="#FF1493", width=2)))
+                fig_line.add_trace(go.Scatter(x=x, y=ya, name="Đội 0 (Xanh)", line=dict(color="#00BFFF", width=2)))
+                fig_line.add_trace(go.Scatter(x=x, y=yb, name="Đội 1 (Hồng)", line=dict(color="#FF1493", width=2)))
                 fig_line.update_layout(
                     title="Diễn biến kiểm soát bóng luỹ kế (%)",
-                    height=260,
+                    height=300,
                     margin=dict(t=40, b=10, l=10, r=10),
                 )
                 st.plotly_chart(fig_line, use_container_width=True)
             else:
                 st.info("Chưa có dữ liệu diễn biến thời gian.")
-        else:
-            st.info("Chưa có tệp dữ liệu thống kê match_stats.json.")
+    else:
+        st.info("Chưa có tệp dữ liệu thống kê match_stats.json.")
 
     # Bảng chi tiết từng cầu thủ
     if csv_p and csv_p.exists():
